@@ -60,4 +60,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- Replaces the WDK's built-in InfVerif target when requested (the WDK 10.0.26100 integration on
+       some hosts fails to load x86\InfVerif.dll); build-drivers.ps1 then runs infverif.exe itself. -->
+  <Import Project="skip-infverif.targets" Condition="'$(BtaSkipInfVerif)' == 'true'" />
 </Project>

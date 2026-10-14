@@ -278,7 +278,7 @@ static NTSTATUS BtaStartTransfer(PBTA_DEVICE_CONTEXT ctx, WDFREQUEST original, P
     WDFREQUEST child = NULL;
     WDF_OBJECT_ATTRIBUTES attr;
     PBTA_TRANSFER t;
-    PBTA_ORIGINAL o;
+    PBTA_ORIGINAL o = NULL;
     WDFMEMORY brbMem = NULL;
     struct _BRB_L2CA_ACL_TRANSFER* xfer;
     PBRB brb;

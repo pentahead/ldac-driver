@@ -36,18 +36,39 @@ $out = Join-Path $root "build\driver\$Config"
 $proj = Join-Path $root 'src\driver\l2cap\BtA2dpL2cap.vcxproj'
 $extra = @()
 if ($nugetWdk -and -not $wdkHeader) { $extra += "/p:WDKContentRoot=$($nugetWdk.FullName)\c\" }
-& $msbuild $proj /p:Configuration=$Config /p:Platform=x64 "/p:OutDir=$out\\" /p:SignMode=Off /m @extra
+# The WDK's built-in InfVerif step is replaced (BtaSkipInfVerif) because on some hosts it cannot load
+# x86\InfVerif.dll; the INF is verified below with the standalone x64 infverif.exe instead.
+& $msbuild $proj /p:Configuration=$Config /p:Platform=x64 "/p:OutDir=$out\\" /p:SignMode=Off /p:BtaSkipInfVerif=true /m @extra
 if ($LASTEXITCODE) { throw 'driver build failed' }
 
 $pkg = Join-Path $out 'BtA2dpL2cap'
 if (-not (Test-Path $pkg)) { New-Item -ItemType Directory $pkg | Out-Null }
 Copy-Item (Join-Path $out 'BtA2dpL2cap.sys') $pkg -Force
 Copy-Item (Join-Path $out 'BtA2dpL2cap.inf') $pkg -Force -ErrorAction SilentlyContinue
-if (-not (Test-Path (Join-Path $pkg 'BtA2dpL2cap.inf'))) { Copy-Item (Join-Path $root 'src\driver\l2cap\BtA2dpL2cap.inf') $pkg }
+if (-not (Test-Path (Join-Path $pkg 'BtA2dpL2cap.inf'))) { throw 'stamped INF missing from build output' }
+
+# stampinf sets DriverVer to the build date; restore the deliberately old date (see the INF comment)
+# so the in-box Windows driver keeps winning rank ties for newly paired headsets.
+$infPath = Join-Path $pkg 'BtA2dpL2cap.inf'
+$inf = Get-Content $infPath
+$inf = $inf -replace '^\s*DriverVer\s*=.*$', 'DriverVer = 01/01/2006,0.1.0.0'
+Set-Content $infPath $inf -Encoding ascii
+if (Select-String -Path $infPath -Pattern '\$KMDFVERSION\$' -Quiet) { throw 'INF was not stamped (KMDF version placeholder remains)' }
+
+$infverif = Get-ChildItem "$kits\Tools\*\x64\infverif.exe", "$kits\bin\*\x64\infverif.exe" -ErrorAction SilentlyContinue |
+    Sort-Object FullName | Select-Object -Last 1
+if ($infverif) {
+    & $infverif.FullName /v /w $infPath | Out-Host
+    if ($LASTEXITCODE) { throw "infverif reported errors for $infPath" }
+} else {
+    Write-Warning 'infverif.exe not found; INF not verified'
+}
 
 $bin = Split-Path (Get-ChildItem "$kits\bin\*\x64\inf2cat.exe" -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
 if ($bin) {
-    & "$bin\inf2cat.exe" /driver:$pkg /os:10_X64 | Out-Host
+    # The INF targets Windows 11 (NTamd64.10.0...22000), so the catalog is built for Windows 11 x64.
+    & "$bin\inf2cat.exe" /driver:$pkg /os:10_CO_X64 | Out-Host
+    if ($LASTEXITCODE) { throw 'inf2cat failed' }
     if ($TestSign) {
         $cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object Subject -eq 'CN=BtA2dpSrc Test Signing' | Select-Object -First 1
         if (-not $cert) {
