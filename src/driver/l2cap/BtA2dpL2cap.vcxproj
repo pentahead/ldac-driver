@@ -53,14 +53,13 @@
   <ItemGroup>
     <ClCompile Include="driver.c" />
   </ItemGroup>
+  <!-- The INF is intentionally not an <Inf> item: scripts/build-drivers.ps1 stamps, verifies
+       (infverif) and catalogs (inf2cat) it, avoiding host-specific WDK INF task failures. -->
   <ItemGroup>
-    <Inf Include="BtA2dpL2cap.inf" />
+    <None Include="BtA2dpL2cap.inf" />
   </ItemGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <!-- Replaces the WDK's built-in InfVerif target when requested (the WDK 10.0.26100 integration on
-       some hosts fails to load x86\InfVerif.dll); build-drivers.ps1 then runs infverif.exe itself. -->
-  <Import Project="skip-infverif.targets" Condition="'$(BtaSkipInfVerif)' == 'true'" />
 </Project>

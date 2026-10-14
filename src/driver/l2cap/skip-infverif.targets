@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Replacement for the WDK InfVerif target, imported only with /p:BtaSkipInfVerif=true.
-     The WDK reaches StampInf through InfVerif, so the dependency is kept; only the in-process
-     verification (which fails to load x86\InfVerif.dll on some hosts) is skipped.
-     scripts\build-drivers.ps1 runs the standalone infverif.exe on the packaged INF instead. -->
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Target Name="InfVerif" DependsOnTargets="StampInf" />
-</Project>
