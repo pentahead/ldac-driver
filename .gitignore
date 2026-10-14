@@ -13,4 +13,5 @@ third_party/libsbc/
 /*.dll
 /resources.pri
 /Driver/
-/Docs/
+# Only the original product's file: git on Windows is case-insensitive, so "/Docs/" would also hide docs/
+/Docs/eula.html
