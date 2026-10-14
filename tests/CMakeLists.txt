@@ -1,0 +1,7 @@
+set(BTA_TEST_SOURCES main.cpp test_common.cpp test_a2dp.cpp test_codec.cpp test_session.cpp)
+if(TARGET bta_platform)
+  list(APPEND BTA_TEST_SOURCES test_platform.cpp)
+endif()
+add_executable(bta_tests ${BTA_TEST_SOURCES})
+target_link_libraries(bta_tests PRIVATE bta_core $<$<TARGET_EXISTS:bta_platform>:bta_platform>)
+add_test(NAME bta_tests COMMAND bta_tests)

@@ -1,0 +1,43 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch pinned codec sources (Apache-2.0)
+        shell: pwsh
+        run: ./scripts/fetch-deps.ps1
+
+      - name: Build user-mode stack and run tests
+        shell: pwsh
+        run: ./scripts/build.ps1 -Config Release -Test
+
+      - name: Report WDK availability
+        id: wdk
+        shell: pwsh
+        run: |
+          $h = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\Include\*\km\wdm.h" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($h) { "found=true" >> $env:GITHUB_OUTPUT; Write-Host "WDK: $($h.FullName)" } else { "found=false" >> $env:GITHUB_OUTPUT; Write-Warning "No WDK on runner" }
+
+      - name: Build kernel driver (unsigned)
+        if: steps.wdk.outputs.found == 'true'
+        shell: pwsh
+        run: ./scripts/build-drivers.ps1 -Config Release
+
+      - name: Package
+        shell: pwsh
+        run: ./scripts/package.ps1 -Config Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BtA2dpSrc-dev
+          path: |
+            dist/*.zip
+            dist/*.sha256

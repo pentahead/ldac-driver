@@ -1,0 +1,16 @@
+# Build outputs
+build/
+dist/
+packages/
+*.user
+
+# Third-party sources are fetched at pinned commits by scripts/fetch-deps.ps1 (CI does this too)
+third_party/libldac/
+third_party/libsbc/
+
+# Original AltA2DP product files (third-party proprietary binaries) - never commit
+/*.exe
+/*.dll
+/resources.pri
+/Driver/
+/Docs/
