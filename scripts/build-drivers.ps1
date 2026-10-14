@@ -63,19 +63,30 @@ if ($infverif) {
     Write-Warning 'infverif.exe not found; INF not verified'
 }
 
-$bin = Split-Path (Get-ChildItem "$kits\bin\*\x64\inf2cat.exe" -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
-if ($bin) {
-    # The INF targets Windows 11 (NTamd64.10.0...22000), so the catalog is built for Windows 11 x64.
-    & "$bin\inf2cat.exe" /driver:$pkg /os:10_CO_X64 | Out-Host
-    if ($LASTEXITCODE) { throw 'inf2cat failed' }
-    if ($TestSign) {
-        $cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object Subject -eq 'CN=BtA2dpSrc Test Signing' | Select-Object -First 1
-        if (-not $cert) {
-            $cert = New-SelfSignedCertificate -Subject 'CN=BtA2dpSrc Test Signing' -Type CodeSigningCert -CertStoreLocation Cert:\CurrentUser\My
-        }
-        & "$bin\signtool.exe" sign /fd sha256 /sha1 $cert.Thumbprint (Join-Path $pkg 'BtA2dpL2cap.sys') (Join-Path $pkg 'BtA2dpL2cap.cat')
-        Export-Certificate -Cert $cert -FilePath (Join-Path $pkg 'BtA2dpSrcTest.cer') | Out-Null
-        Write-Host "Test-signed. Trust BtA2dpSrcTest.cer only on a dedicated test machine with test signing enabled." -ForegroundColor Yellow
-    }
+# WDK tool locations differ: inf2cat ships in bin\<ver>\x86 only; signtool in bin\<ver>\x64.
+function Find-KitTool([string]$name) {
+    Get-ChildItem "$kits\bin\*\x64\$name", "$kits\bin\*\x86\$name" -ErrorAction SilentlyContinue |
+        Sort-Object FullName | Select-Object -Last 1 -ExpandProperty FullName
 }
+
+$inf2cat = Find-KitTool 'inf2cat.exe'
+if (-not $inf2cat) { throw 'inf2cat.exe not found in the Windows Kits bin directories' }
+# The INF targets Windows 11 (NTamd64.10.0...22000), so the catalog is built for Windows 11 x64.
+& $inf2cat /driver:$pkg /os:10_CO_X64 | Out-Host
+if ($LASTEXITCODE) { throw 'inf2cat failed' }
+if (-not (Test-Path (Join-Path $pkg 'BtA2dpL2cap.cat'))) { throw 'inf2cat produced no catalog' }
+
+if ($TestSign) {
+    $signtool = Find-KitTool 'signtool.exe'
+    if (-not $signtool) { throw 'signtool.exe not found' }
+    $cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object Subject -eq 'CN=BtA2dpSrc Test Signing' | Select-Object -First 1
+    if (-not $cert) {
+        $cert = New-SelfSignedCertificate -Subject 'CN=BtA2dpSrc Test Signing' -Type CodeSigningCert -CertStoreLocation Cert:\CurrentUser\My
+    }
+    & $signtool sign /fd sha256 /sha1 $cert.Thumbprint (Join-Path $pkg 'BtA2dpL2cap.sys') (Join-Path $pkg 'BtA2dpL2cap.cat')
+    if ($LASTEXITCODE) { throw 'signing failed' }
+    Export-Certificate -Cert $cert -FilePath (Join-Path $pkg 'BtA2dpSrcTest.cer') | Out-Null
+    Write-Host "Test-signed. Trust BtA2dpSrcTest.cer only on a dedicated test machine with test signing enabled." -ForegroundColor Yellow
+}
+Get-ChildItem $pkg | Select-Object Name, Length | Format-Table | Out-Host
 Write-Host "Driver package: $pkg" -ForegroundColor Green
